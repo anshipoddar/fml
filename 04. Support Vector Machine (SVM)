@@ -1,0 +1,122 @@
+#Support Vector Machine (SVM)
+1. **Setup and Data Loading**
+
+- **Imports**:
+
+- - SVC (Support Vector Classifier) from scikit-learn.
+
+- - StandardScaler for feature standardization (critical for SVM).
+
+- - classification_report for model evaluation.
+
+- **Data Loading**:
+
+- - Loads magic04.data with particle collision features.
+
+- - Converts class labels to binary (1=Gamma, 0=Hadron).
+# Setup and Data Loading
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import classification_report
+from sklearn.svm import SVC
+# Load data
+cols = ["fLength", "fWidth", "fSize", "fConc", "fConcl", "fAsym",
+        "fM3Long", "fM3Trans", "fAlpha", "fDist", "class"]
+df = pd.read_csv("magic04.data", names=cols)
+df["class"] = (df["class"] == "g").astype(int)  # Binary: 1=Gamma, 0=Hadron
+2. **Data Preparation**
+
+- **prepare_data() Function**:
+
+- - Standardizes features (StandardScaler) to ensure equal influence on the SVM margin.
+
+- - Oversampling: Uses RandomOverSampler to balance classes (critical for SVM, which is sensitive to class imbalance).
+
+- **Train-Test Split**:
+
+- - 60% training, 20% validation, 20% test (shuffled).
+# Data Preparation
+def prepare_data(df, oversample=False):
+    X = df[cols[:-1]].values
+    y = df[cols[-1]].values
+    X = StandardScaler().fit_transform(X)  # Standardize features
+    if oversample:
+        from imblearn.over_sampling import RandomOverSampler
+        X, y = RandomOverSampler().fit_resample(X, y)
+    return X, y
+
+# Split data
+train, valid, test = np.split(df.sample(frac=1), [int(0.6*len(df)), int(0.8*len(df))])
+X_train, y_train = prepare_data(train, oversample=True)  # Balance classes
+X_test, y_test = prepare_data(test)
+3. **Training and Evaluation**
+
+- **Model Initialization**:
+
+- - svm = SVC(kernel='rbf')  # RBF kernel for non-linear boundaries
+Other kernels: linear, poly, sigmoid.
+
+- **Training**:
+
+- - svm.fit(X_train, y_train)  # Finds optimal hyperplane
+
+- **Prediction & Evaluation**:
+
+- - y_pred = svm.predict(X_test)
+print(classification_report(y_test, y_pred))
+
+
+Reports precision, recall, F1-score, and accuracy.
+# Train and Evaluate SVM
+svm = SVC(kernel='rbf')  # Try kernel='linear', 'poly'
+svm.fit(X_train, y_train)
+y_pred = svm.predict(X_test)
+print(classification_report(y_test, y_pred))
+4. **Decision Boundary Visualization (2D PCA)**
+
+- **PCA Reduction**: Projects features onto 2 principal components for plotting.
+
+- **Meshgrid Prediction**: Generates a grid of points and predicts their class using the trained SVM.
+
+- **Plot**:
+
+- - plt.contourf(xx, yy, Z, alpha=0.3)  # Decision boundary
+- - plt.scatter(X_train_pca[:, 0], X_train_pca[:, 1], c=y_train)  # Data points
+
+Shows how the non-linear (RBF) boundary separates classes in reduced space.
+# Visualize Decision Boundary (2D PCA Projection)
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.svm import SVC
+
+
+# Step 1: Reduce features to 2D using PCA
+pca = PCA(n_components=2)
+X_train_pca = pca.fit_transform(X_train)
+X_test_pca = pca.transform(X_test)
+
+# Step 2: Retrain SVM on 2D data (for visualization)
+model_pca = SVC(kernel='rbf').fit(X_train_pca, y_train)
+
+# Step 3: Create a meshgrid for decision boundary
+x_min, x_max = X_train_pca[:, 0].min() - 1, X_train_pca[:, 0].max() + 1
+y_min, y_max = X_train_pca[:, 1].min() - 1, X_train_pca[:, 1].max() + 1
+xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.02),
+                     np.arange(y_min, y_max, 0.02))
+Z = model_pca.predict(np.c_[xx.ravel(), yy.ravel()])
+Z = Z.reshape(xx.shape)
+
+# Step 4: Plot decision boundary and data points
+plt.figure(figsize=(10, 6))
+plt.contourf(xx, yy, Z, alpha=0.3, cmap=plt.cm.Paired)
+plt.scatter(X_train_pca[:, 0], X_train_pca[:, 1], c=y_train,
+            edgecolor='k', s=50, cmap=plt.cm.Paired)
+plt.title("SVM Decision Boundary (PCA-Reduced Data)")
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.colorbar(label="Class (0=Hadron, 1=Gamma)")
+plt.show()
