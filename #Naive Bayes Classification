@@ -1,0 +1,81 @@
+#Naive Bayes Classification
+
+1. **Setup and Data Loading**
+
+**Imports**:
+
+- pandas, numpy for data handling.
+
+- StandardScaler for feature standardization.
+
+- GaussianNB for the Naive Bayes classifier.
+
+- classification_report for model evaluation.
+
+**Data Loading**:
+
+- The dataset (magic04.data) is loaded with features describing particle collisions.
+
+- The class column is converted to binary (1 = Gamma, 0 = Hadron).
+# Setup and Data Loading
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import classification_report
+from sklearn.naive_bayes import GaussianNB
+# Load data
+cols = ["fLength", "fWidth", "fSize", "fConc", "fConcl", "fAsym",
+        "fM3Long", "fM3Trans", "fAlpha", "fDist", "class"]
+df = pd.read_csv("magic04.data", names=cols)
+df["class"] = (df["class"] == "g").astype(int)  # Binary: 1=Gamma, 0=Hadron
+2. **Data Preparation**
+
+**prepare_data() Function**:
+
+- Extracts features (X) and labels (y).
+
+- Standardizes features (StandardScaler) to ensure Gaussian Naive Bayes works optimally.
+
+- Oversampling (if enabled): Uses RandomOverSampler to balance class distribution (since Naive Bayes can be biased toward majority classes).
+
+**Train-Validation-Test Split**:
+
+- Data is shuffled and split into 60% training, 20% validation, and 20% test sets.
+
+- The training set is oversampled to handle class imbalance.
+# Data Preparation
+def prepare_data(df, oversample=False):
+    X = df[cols[:-1]].values
+    y = df[cols[-1]].values
+    X = StandardScaler().fit_transform(X)  # Standardize features
+    if oversample:
+        from imblearn.over_sampling import RandomOverSampler
+        X, y = RandomOverSampler().fit_resample(X, y)
+    return X, y
+# Split data
+train, valid, test = np.split(df.sample(frac=1), [int(0.6*len(df)), int(0.8*len(df))])
+X_train, y_train = prepare_data(train, oversample=True)  # Balance classes
+X_test, y_test = prepare_data(test)
+3. **Training and Evaluating Naive Bayes**
+
+- **Model Initialization**:
+
+- - nb = GaussianNB()  # Assumes features follow a Gaussian distribution
+
+- **Training**:
+
+- - nb.fit(X_train, y_train)  # Learns mean & variance of each feature per class
+
+- **Prediction & Evaluation**:
+
+- - y_pred = nb.predict(X_test)
+print(classification_report(y_test, y_pred))
+
+The classification_report shows precision, recall, F1-score, and accuracy.
+# Train and Evaluate Naive Bayes
+nb = GaussianNB()
+nb.fit(X_train, y_train)
+y_pred = nb.predict(X_test)
+print(classification_report(y_test, y_pred))
