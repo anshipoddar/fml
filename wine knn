@@ -1,0 +1,90 @@
+# Setup and Data Loading
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import classification_report
+from sklearn.decomposition import PCA
+
+# Load Wine Quality dataset (red wine for this example)
+df = pd.read_csv("winequality-red.csv", sep=";")
+
+# Convert quality to binary classification
+df["quality"] = (df["quality"] > 5).astype(int)  # 1=Good, 0=Poor
+
+# Column names (excluding target)
+cols = df.columns.tolist()
+cols.remove("quality")
+
+# Data Preparation
+def prepare_data(df, oversample=False, log_transform=False):
+    features = df.copy()
+    if log_transform:
+        features["residual sugar"] = np.log1p(features["residual sugar"])
+    X = features[cols].values
+    y = df["quality"].values
+    X = StandardScaler().fit_transform(X)
+    if oversample:
+        from imblearn.over_sampling import RandomOverSampler
+        X, y = RandomOverSampler().fit_resample(X, y)
+    return X, y
+
+# Split data
+train, valid, test = np.split(df.sample(frac=1, random_state=42), [int(0.6*len(df)), int(0.8*len(df))])
+X_train, y_train = prepare_data(train, oversample=True)
+X_test, y_test = prepare_data(test)
+
+# Train and Evaluate KNN
+knn = KNeighborsClassifier(n_neighbors=7)
+knn.fit(X_train, y_train)
+y_pred = knn.predict(X_test)
+print("=== KNN Results Without Log Transform ===")
+print(classification_report(y_test, y_pred))
+
+# Log Transform on residual sugar and retrain
+X_train_log, y_train_log = prepare_data(train, oversample=True, log_transform=True)
+X_test_log, y_test_log = prepare_data(test, log_transform=True)
+
+knn_log = KNeighborsClassifier(n_neighbors=7)
+knn_log.fit(X_train_log, y_train_log)
+y_pred_log = knn_log.predict(X_test_log)
+print("=== KNN Results With Log Transform on Residual Sugar ===")
+print(classification_report(y_test_log, y_pred_log))
+
+# PCA for Visualization
+pca = PCA(n_components=2)
+X_train_pca = pca.fit_transform(X_train)
+X_test_pca = pca.transform(X_test)
+
+knn_pca = KNeighborsClassifier(n_neighbors=7)
+knn_pca.fit(X_train_pca, y_train)
+
+# Meshgrid
+x_min, x_max = X_train_pca[:, 0].min() - 1, X_train_pca[:, 0].max() + 1
+y_min, y_max = X_train_pca[:, 1].min() - 1, X_train_pca[:, 1].max() + 1
+xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.05),
+                     np.arange(y_min, y_max, 0.05))
+Z = knn_pca.predict(np.c_[xx.ravel(), yy.ravel()])
+Z = Z.reshape(xx.shape)
+
+# Plot decision boundary
+plt.figure(figsize=(10, 6))
+plt.contourf(xx, yy, Z, alpha=0.3, cmap=plt.cm.Paired)
+plt.scatter(X_train_pca[:, 0], X_train_pca[:, 1], c=y_train,
+            edgecolor='k', s=50, cmap=plt.cm.Paired)
+plt.title("KNN Decision Boundary (PCA-Reduced Wine Data)")
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.colorbar(label="Class (0=Poor, 1=Good)")
+plt.show()
+
+# Alcohol vs Volatile Acidity Scatter Plot
+plt.figure(figsize=(8, 5))
+plt.scatter(df["alcohol"], df["volatile acidity"], c=df["quality"], cmap='coolwarm', edgecolor='k')
+plt.xlabel("Alcohol")
+plt.ylabel("Volatile Acidity")
+plt.title("Alcohol vs Volatile Acidity Colored by Quality (0=Poor, 1=Good)")
+plt.colorbar(label="Quality Class")
+plt.grid(True)
+plt.show()
